@@ -4,9 +4,9 @@ import ta
 import requests
 import time
 
-# --- APNI DETAILS YAHAN DAALEIN ---
+# --- APNI VERIFIED DETAILS ---
 BOT_TOKEN = "5356164098:AAEjSvKdZXAwMyS7xcFzakiqgUqwUZVcKdI"
-CHAT_ID = "YOUR_CHAT_ID_HERE"  # Yahan @userinfobot se mili apni Chat ID daalein (e.g. "123456789")
+CHAT_ID = "853263656"
 
 def send_telegram(message):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
@@ -23,12 +23,12 @@ def scan():
         markets = exchange.load_markets()
         symbols = [s for s in markets if '/USDT' in s and markets[s]['swap']]
         
-        print(f"Scanning {len(symbols)} perpetual pairs...")
+        print(f"Scanning {len(symbols)} perpetual pairs on 15m timeframe...")
         
         for symbol in symbols:
             try:
-                # 1h timeframe ki candles (aap timeframe change kar sakte hain)
-                bars = exchange.fetch_ohlcv(symbol, timeframe='1h', limit=50)
+                # 15m timeframe ki candles
+                bars = exchange.fetch_ohlcv(symbol, timeframe='15m', limit=50)
                 df = pd.DataFrame(bars, columns=['time', 'open', 'high', 'low', 'close', 'vol'])
                 
                 # Indicators Calculation
@@ -45,7 +45,7 @@ def scan():
                 # - Swing High > 30 EMA High
                 # - Close < 30 EMA Low
                 if any(prev['rsi_smooth'] > 70) and any(prev['high'] > prev['ema_high']) and last['close'] < last['ema_low']:
-                    msg = f"🔻 SHORT ALERT: {symbol}\nPrice: {last['close']}\nTimeframe: 1H"
+                    msg = f"🔻 SHORT ALERT (15M): {symbol}\nPrice: {last['close']}"
                     send_telegram(msg)
                     print(msg)
                     
@@ -54,7 +54,7 @@ def scan():
                 # - Swing Low < 30 EMA Low
                 # - Close > 30 EMA High
                 if any(prev['rsi_smooth'] < 30) and any(prev['low'] < prev['ema_low']) and last['close'] > last['ema_high']:
-                    msg = f"🟢 LONG ALERT: {symbol}\nPrice: {last['close']}\nTimeframe: 1H"
+                    msg = f"🟢 LONG ALERT (15M): {symbol}\nPrice: {last['close']}"
                     send_telegram(msg)
                     print(msg)
                     
@@ -65,7 +65,7 @@ def scan():
         print("Scan loop error:", e)
 
 if __name__ == "__main__":
-    send_telegram("🚀 Trading System Scanner Started Successfully!")
+    send_telegram("🚀 15M Trading System Scanner Started Successfully!")
     while True:
         scan()
-        time.sleep(300) # Har 5 minute me dubara scan karega
+        time.sleep(180) # Har 3 minute me scan karega
