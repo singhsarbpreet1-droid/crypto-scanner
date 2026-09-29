@@ -3,10 +3,18 @@ import pandas as pd
 import ta
 import requests
 import time
+import threading
+from flask import Flask
 
 # --- APNI VERIFIED DETAILS ---
 BOT_TOKEN = "5356164098:AAEjSvKdZXAwMyS7xcFzakiqgUqwUZVcKdI"
 CHAT_ID = "853263656"
+
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Scanner is running active 24/7!"
 
 def send_telegram(message):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
@@ -41,18 +49,12 @@ def scan():
                 prev = df.iloc[-5:] # Last 5 candles scan
                 
                 # 1. SHORT Scenario Logic
-                # - RSI Smooth > 70
-                # - Swing High > 30 EMA High
-                # - Close < 30 EMA Low
                 if any(prev['rsi_smooth'] > 70) and any(prev['high'] > prev['ema_high']) and last['close'] < last['ema_low']:
                     msg = f"🔻 SHORT ALERT (15M): {symbol}\nPrice: {last['close']}"
                     send_telegram(msg)
                     print(msg)
                     
                 # 2. LONG Scenario Logic
-                # - RSI Smooth < 30
-                # - Swing Low < 30 EMA Low
-                # - Close > 30 EMA High
                 if any(prev['rsi_smooth'] < 30) and any(prev['low'] < prev['ema_low']) and last['close'] > last['ema_high']:
                     msg = f"🟢 LONG ALERT (15M): {symbol}\nPrice: {last['close']}"
                     send_telegram(msg)
@@ -64,8 +66,18 @@ def scan():
     except Exception as e:
         print("Scan loop error:", e)
 
-if __name__ == "__main__":
+def run_scanner():
     send_telegram("🚀 15M Trading System Scanner Started Successfully!")
     while True:
         scan()
         time.sleep(180) # Har 3 minute me scan karega
+
+if __name__ == "__main__":
+    # Background Thread for Scanner
+    t = threading.Thread(target=run_scanner)
+    t.daemon = True
+    t.start()
+    
+    # Web Server for Render Port Check
+    app.run(host='0.0.0.0', port=10000)
+    
