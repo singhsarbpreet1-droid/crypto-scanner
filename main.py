@@ -1,0 +1,71 @@
+import ccxt
+import pandas as pd
+import ta
+import requests
+import time
+
+# --- APNI DETAILS YAHAN DAALEIN ---
+BOT_TOKEN = "5356164098:AAEjSvKdZXAwMyS7xcFzakiqgUqwUZVcKdI"
+CHAT_ID = "YOUR_CHAT_ID_HERE"  # Yahan @userinfobot se mili apni Chat ID daalein (e.g. "123456789")
+
+def send_telegram(message):
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    try:
+        requests.post(url, data={"chat_id": CHAT_ID, "text": message})
+    except Exception as e:
+        print("Telegram error:", e)
+
+# Binance Futures Exchange Connection
+exchange = ccxt.binance({'options': {'defaultType': 'future'}})
+
+def scan():
+    try:
+        markets = exchange.load_markets()
+        symbols = [s for s in markets if '/USDT' in s and markets[s]['swap']]
+        
+        print(f"Scanning {len(symbols)} perpetual pairs...")
+        
+        for symbol in symbols:
+            try:
+                # 1h timeframe ki candles (aap timeframe change kar sakte hain)
+                bars = exchange.fetch_ohlcv(symbol, timeframe='1h', limit=50)
+                df = pd.DataFrame(bars, columns=['time', 'open', 'high', 'low', 'close', 'vol'])
+                
+                # Indicators Calculation
+                df['rsi'] = ta.momentum.rsi(df['close'], window=14)
+                df['rsi_smooth'] = ta.trend.sma_indicator(df['rsi'], window=14)
+                df['ema_high'] = ta.trend.ema_indicator(df['high'], window=30)
+                df['ema_low'] = ta.trend.ema_indicator(df['low'], window=30)
+                
+                last = df.iloc[-1]
+                prev = df.iloc[-5:] # Last 5 candles scan
+                
+                # 1. SHORT Scenario Logic
+                # - RSI Smooth > 70
+                # - Swing High > 30 EMA High
+                # - Close < 30 EMA Low
+                if any(prev['rsi_smooth'] > 70) and any(prev['high'] > prev['ema_high']) and last['close'] < last['ema_low']:
+                    msg = f"🔻 SHORT ALERT: {symbol}\nPrice: {last['close']}\nTimeframe: 1H"
+                    send_telegram(msg)
+                    print(msg)
+                    
+                # 2. LONG Scenario Logic
+                # - RSI Smooth < 30
+                # - Swing Low < 30 EMA Low
+                # - Close > 30 EMA High
+                if any(prev['rsi_smooth'] < 30) and any(prev['low'] < prev['ema_low']) and last['close'] > last['ema_high']:
+                    msg = f"🟢 LONG ALERT: {symbol}\nPrice: {last['close']}\nTimeframe: 1H"
+                    send_telegram(msg)
+                    print(msg)
+                    
+                time.sleep(0.1) # Binance API rate limit protection
+            except Exception as e:
+                continue
+    except Exception as e:
+        print("Scan loop error:", e)
+
+if __name__ == "__main__":
+    send_telegram("🚀 Trading System Scanner Started Successfully!")
+    while True:
+        scan()
+        time.sleep(300) # Har 5 minute me dubara scan karega
