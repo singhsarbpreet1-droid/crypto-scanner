@@ -4,6 +4,7 @@ import ta
 import requests
 import time
 import threading
+import os
 from flask import Flask
 
 # --- APNI VERIFIED DETAILS ---
@@ -78,6 +79,6 @@ if __name__ == "__main__":
     t.daemon = True
     t.start()
     
-    # Web Server for Render Port Check
-    app.run(host='0.0.0.0', port=10000)
-    
+    # Dynamic Port assignment for Render
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
